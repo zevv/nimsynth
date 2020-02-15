@@ -17,7 +17,7 @@ var o1 = initOsc(srate, OscSaw, 110.0)
 var o2 = initOsc(srate, OscSaw, 110.0 * 3.0 / 2.0 * 1.006)
 
 var lp1 = initBiquad(srate, BiquadLowpass, 2000.0, 4.0)
-var lp2 = initBiquad(srate, BiquadLowpass, 2000.0, 8.0)
+var lp2 = initBiquad(srate, BiquadLowpass, 2000.0, 5.0)
 
 var delay1 = initDelay(srate, 1.0)
 var delay2 = initDelay(srate, 1.0)
@@ -37,8 +37,8 @@ proc genAudio() =
       var w1 = lp1.run(v1 * 0.1 + v2 * 0.3) * 0.5
       var w2 = lp2.run(v1 * 0.3 + v2 * 0.1) * 0.5
 
-      w1 = w1 + delay1.run(w1)
-      w2 = w2 + delay2.run(w2)
+      w1 = delay1.run(w1)
+      w2 = delay2.run(w2)
 
       buf.add w1
       buf.add w2
