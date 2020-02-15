@@ -6,7 +6,7 @@ import types
 
 const
   srate = 48000.0
-  audioBuffers = 8
+  audioBuffers = 1
 
 type
 
@@ -23,18 +23,16 @@ type
 
 var
   playPool: AudioPool
-  playPoolPtr: array[audioBuffers, ptr float32]
 
 
 {.push stackTrace: off.}
-proc on_audio(userdata: pointer, stream: ptr uint8, len: cint) {.cdecl, exportc.} =
 
-  #copyMem(stream, playPoolPtr[playPoolTail], len)
+proc on_audio(userdata: pointer, stream: ptr uint8, len: cint) {.cdecl, exportc.} =
   copyMem(stream, playPool.buffers[playPool.tail].data[0].addr, len)
   playPool.tail = (playPool.tail + 1) mod audioBuffers
-
   var e = sdl.Event(kind: UserEvent)
   discard pushEvent(addr e)
+
 {.pop}
 
 
@@ -63,7 +61,7 @@ proc initAudio*(srate: SampleRate): Audio =
     freq: srate.int,
     format: AUDIO_F32,
     channels: 1,
-    samples: 1024,
+    samples: 256,
     callback: on_audio,
     userdata: cast[pointer](0)
   )
@@ -75,9 +73,11 @@ proc initAudio*(srate: SampleRate): Audio =
     let buf = AudioBuf()
     buf.data.setLen got.channels.int * got.samples.int * sizeof(float32)
     playPool.buffers.add buf
-    playPoolPtr[i] = buf.data[0].addr
 
-  result.adev = adev
-  result.samples = got.samples.int
+  var au: Audio
+  au.adev = adev
+  au.samples = got.samples.int
+  au.start()
 
-  result.start()
+  return au
+
