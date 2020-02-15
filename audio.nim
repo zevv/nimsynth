@@ -1,18 +1,18 @@
 
 import sdl2/sdl
-import system/ansi_c
 
-import types
+import dsp/types
 
 
 type
 
   Audio* = ref object
+    srate*: Samplerate
     samples*: int
     channels*: int
     buffers: int
     adev: AudioDeviceID
-    playPool: AudioPool
+    play: AudioPool
 
   AudioBuf = ref object
     data: seq[float32]
@@ -29,36 +29,39 @@ type
 
 proc on_audio(userdata: pointer, stream: ptr uint8, len: cint) {.cdecl, exportc.} =
   let au = cast[Audio](userdata)
-  copyMem(stream, au.playPool.buffers[au.playPool.tail].data[0].addr, len)
-  au.playPool.tail = (au.playPool.tail + 1) mod au.buffers
+  copyMem(stream, au.play.buffers[au.play.tail].data[0].addr, len)
+  au.play.tail = (au.play.tail + 1) mod au.buffers
   var e = sdl.Event(kind: UserEvent)
   discard pushEvent(addr e)
 
 {.pop}
 
 
-proc start*(audio: Audio) =
-  pauseAudioDevice(audio.adev, 0)
+proc start*(au: Audio) =
+  pauseAudioDevice(au.adev, 0)
 
 
-proc stop*(audio: Audio) =
-  pauseAudioDevice(audio.adev, 1)
+proc stop*(au: Audio) =
+  pauseAudioDevice(au.adev, 1)
+
+
+proc feed*(au: Audio): bool =
+  let nexthead = (au.play.head + 1) mod au.buffers
+  return nexthead != au.play.tail
 
 
 proc send*(au: Audio, buf: openArray[Sample]) =
-  var p = au.playPool.buffers[au.playPool.head]
+  var p = au.play.buffers[au.play.head]
   for i in 0..<buf.len:
     p.data[i] = buf[i]
-  au.playPool.head = (au.playPool.head + 1) mod au.buffers
+  au.play.head = (au.play.head + 1) mod au.buffers
 
 
-proc initAudio*(srate: SampleRate=48000.0, channels=2, samples=256, buffers=3): Audio =
+proc initAudio*(srate: SampleRate=48000.0, channels=2, samples=256, buffers=5): Audio =
 
   discard sdl.init(sdl.InitAudio)
   
   var au = Audio()
-
-  let n = sdl.getNumAudioDevices(1)
 
   var want = AudioSpec(
     freq: srate.int,
@@ -72,15 +75,21 @@ proc initAudio*(srate: SampleRate=48000.0, channels=2, samples=256, buffers=3): 
   var got: AudioSpec
 
   au.adev = openAudioDevice(nil, 0, addr want, addr got, 0)
+  au.srate = got.freq.Samplerate
   au.samples = got.samples.int
   au.channels = got.channels.int
   au.samples = got.samples.int
   au.buffers = buffers
+  
+  echo "Opened audio device '", getAudioDeviceName(0, 0), "' at ", au.srate, " Hz"
+
 
   for i in 0..<buffers:
     let buf = AudioBuf()
     buf.data.setLen got.channels.int * got.samples.int
-    au.playPool.buffers.add buf
+    au.play.buffers.add buf
+    var e = sdl.Event(kind: UserEvent)
+    discard pushEvent(addr e)
 
   au.start()
 
