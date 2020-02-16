@@ -22,10 +22,11 @@ type
     head, tail: int
 
 
-{.push stackTrace: off.}
 
-# This will run from the SDL thread, make sure not do do anything here that
-# involves Nim memory management
+# The on_audio callback will run from the SDL thread, make sure not do do
+# anything here that involves Nim memory management
+
+{.push stackTrace: off.}
 
 proc on_audio(userdata: pointer, stream: ptr uint8, len: cint) {.cdecl, exportc.} =
   let au = cast[Audio](userdata)
@@ -82,7 +83,6 @@ proc initAudio*(srate: SampleRate=48000.0, channels=2, samples=256, buffers=5): 
   au.buffers = buffers
   
   echo "Opened audio device '", getAudioDeviceName(0, 0), "' at ", au.srate, " Hz"
-
 
   for i in 0..<buffers:
     let buf = AudioBuf()
